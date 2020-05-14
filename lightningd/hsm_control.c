@@ -86,6 +86,8 @@ static unsigned int hsm_msg(struct subd *hsmd,
 
 void hsm_init(struct lightningd *ld)
 {
+	u8 *passphrase;
+	u8 *mnemonic;
 	u8 *msg;
 	int fds[2];
 
@@ -110,6 +112,15 @@ void hsm_init(struct lightningd *ld)
 			        "--encrypted-hsm startup option.");
 	}
 
+	/* Convert mnemonic and passhrase from 'char' arrays to 'u8' arrays as
+	 * requested by towite_hsm_init. */
+	mnemonic = tal_arrz(tmpctx, u8, strlen(ld->config.mnemonic));
+	passphrase = tal_arrz(tmpctx, u8, strlen(ld->config.passphrase));
+	memcpy(mnemonic, (u8 *)ld->config.mnemonic,
+	       strlen(ld->config.mnemonic));
+	memcpy(passphrase, (u8 *)ld->config.passphrase,
+	       strlen(ld->config.passphrase));
+
 	ld->hsm_fd = fds[0];
 	if (!wire_sync_write(ld->hsm_fd, towire_hsm_init(tmpctx,
 							 &chainparams->bip32_key_version,
@@ -118,7 +129,9 @@ void hsm_init(struct lightningd *ld)
 							 IFDEV(ld->dev_force_privkey, NULL),
 							 IFDEV(ld->dev_force_bip32_seed, NULL),
 							 IFDEV(ld->dev_force_channel_secrets, NULL),
-							 IFDEV(ld->dev_force_channel_secrets_shaseed, NULL))))
+							 IFDEV(ld->dev_force_channel_secrets_shaseed, NULL),
+							 mnemonic,
+							 passphrase)))
 		err(1, "Writing init msg to hsm");
 
 	ld->wallet->bip32_base = tal(ld->wallet, struct ext_key);
